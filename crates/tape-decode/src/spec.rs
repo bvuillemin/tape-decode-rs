@@ -762,6 +762,8 @@ impl DecoderSpec {
                 mult,
                 rest_amplitude,
                 &chroma_filter_final,
+                sys_params.outlinelen,
+                sys_params.active_video_us,
             )
         });
 
