@@ -31,8 +31,6 @@ const BELL_F0_HZ: f64 = 4_286_000.0;
 /// (dropouts, no colour) reaches the downstream colour killers as a collapse
 /// rather than as full-scale noise.
 const LIMITER_KNEE: f32 = 0.5;
-/// First line with chroma output.
-const STARTING_LINE: usize = 16;
 /// Rest carriers of the D'R and D'B lines (ITU-R BT.470).
 const REST_HZ: [f64; 2] = [4_406_250.0, 4_250_000.0];
 
@@ -393,21 +391,20 @@ impl Blanking {
     }
 }
 
-/// The restored chroma block of a field, zeroed before the first line with
-/// colour. No per-line AGC: the limiter sets the carrier amplitude and the
-/// anti-bell shapes it, and normalizing every line to its porch level would
-/// flatten the intended foR/foB rest amplitude difference.
+/// The restored chroma block of a field, zeroed up to the line colour comes
+/// back on after a field without it. No per-line AGC: the limiter sets the
+/// carrier amplitude and the anti-bell shapes it, and normalizing every line
+/// to its porch level would flatten the intended foR/foB rest amplitude
+/// difference.
 pub(super) fn process_chroma(
     field: &DecodedField,
     playback: &Method1Playback,
     chroma: &[f32],
 ) -> Vec<f32> {
-    let first_line = match field.burst_start_line() {
-        line if line > 0 => STARTING_LINE.max(field.output_row(line as usize)),
-        _ => STARTING_LINE,
-    };
     let mut block = playback.restore(chroma);
-    let blanked = (first_line * field.outlinelen).min(block.len());
-    block[..blanked].fill(0.0);
+    if let Ok(line @ 1..) = usize::try_from(field.burst_start_line()) {
+        let blanked = (field.output_row(line) * field.outlinelen).min(block.len());
+        block[..blanked].fill(0.0);
+    }
     block
 }
